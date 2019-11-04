@@ -17,6 +17,12 @@
 #include "print.h"
 #include "util.h"
 
+#define P_PUTS(p, str) do {                   \
+  p = isl_printer_start_line(p);              \
+  p = isl_printer_print_str(p, str);          \
+  p = isl_printer_end_line(p);                \
+} while (0)
+
 static __isl_give isl_printer *print_cuda_macros(__isl_take isl_printer *p)
 {
 	const char *macros =
@@ -138,6 +144,8 @@ static __isl_give isl_printer *free_device_arrays(__isl_take isl_printer *p,
 static __isl_give isl_printer *copy_array_to_device(__isl_take isl_printer *p,
 	struct gpu_array_info *array)
 {
+  P_PUTS(p, "{");
+
 	p = isl_printer_start_line(p);
 	p = isl_printer_print_str(p, "cudaCheckReturn(cudaMemcpy(dev_");
 	p = isl_printer_print_str(p, array->name);
@@ -152,6 +160,14 @@ static __isl_give isl_printer *copy_array_to_device(__isl_take isl_printer *p,
 	p = isl_printer_print_str(p, ", cudaMemcpyHostToDevice));");
 	p = isl_printer_end_line(p);
 
+  /* For StencilBench */
+  P_PUTS(p, "#ifdef STENCILBENCH");
+  P_PUTS(p, "cudaDeviceSynchronize();");
+  P_PUTS(p, "SB_START_INSTRUMENTS;");
+  P_PUTS(p, "#endif");
+
+  P_PUTS(p, "}");
+
 	return p;
 }
 
@@ -163,6 +179,14 @@ static __isl_give isl_printer *copy_array_to_device(__isl_take isl_printer *p,
 static __isl_give isl_printer *copy_array_from_device(
 	__isl_take isl_printer *p, struct gpu_array_info *array)
 {
+  P_PUTS(p, "{");
+
+  /* For StencilBench */
+  P_PUTS(p, "#ifdef STENCILBENCH");
+  P_PUTS(p, "cudaDeviceSynchronize();");
+  P_PUTS(p, "SB_STOP_INSTRUMENTS;");
+  P_PUTS(p, "#endif");
+
 	p = isl_printer_start_line(p);
 	p = isl_printer_print_str(p, "cudaCheckReturn(cudaMemcpy(");
 	if (gpu_array_is_scalar(array))
@@ -174,6 +198,8 @@ static __isl_give isl_printer *copy_array_from_device(
 	p = gpu_array_info_print_size(p, array);
 	p = isl_printer_print_str(p, ", cudaMemcpyDeviceToHost));");
 	p = isl_printer_end_line(p);
+
+  P_PUTS(p, "}");
 
 	return p;
 }
